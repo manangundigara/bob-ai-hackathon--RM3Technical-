@@ -1,18 +1,15 @@
 import os
-import requests
 import json
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS   # ← NEW
 from dotenv import load_dotenv
 
 load_dotenv()
 
 app = Flask(__name__)
+CORS(app)   # ← Allow ALL cross-origin requests (fixes "Failed to fetch")
 
-# IBM Bob Configuration
-BOB_API_KEY = os.getenv("BOB_API_KEY")
-BOB_API_URL = "https://api.bob.ibm.com/v1/chat/completions"
-
-# Mock Data
+# ---------------- Mock Data ----------------
 MOCK_SHIPMENTS = [
     {"id": "SHIP-001", "route": "Shanghai -> LA", "status": "In Transit", "cargo": "Electronics", "value": 200000},
     {"id": "SHIP-002", "route": "Mumbai -> Rotterdam", "status": "Delayed", "cargo": "Vaccines", "value": 500000, "temp_sensor": "T-998"},
@@ -25,43 +22,32 @@ MOCK_FLEET = [
     {"id": "VESSEL-09", "location": "Shanghai", "status": "Maintenance", "capacity": "Cold Storage"}
 ]
 
-
+# ---------------- Bob AI (Simulated) ----------------
 def call_bob_ai(prompt):
-    """Helper to call IBM Bob API (with simulated fallback)."""
-    # --- SIMULATED BOB LOGIC FOR DEMO ---
-    if "disruption" in prompt.lower():
+    p = prompt.lower()
+    if "disruption" in p or "port strike" in p:
         return json.dumps({
             "affected_shipments": ["SHIP-002"],
             "reason": "Port strike in Rotterdam",
             "recommendation": "Reroute to Antwerp or use TRUCK-02"
         })
-    if "cold chain" in prompt.lower() or "temperature" in prompt.lower():
+    if "cold chain" in p or "temperature" in p or "sensor" in p:
         return json.dumps({
             "shipment_id": "SHIP-002",
             "risk_level": "CRITICAL",
             "action": "Immediate inspection required. Temp excursion detected at 08:00 AM."
         })
-    if "fleet" in prompt.lower():
+    if "fleet" in p:
         return json.dumps({
             "idle_assets": ["TRUCK-01", "TRUCK-02"],
             "redeployment_plan": "Assign TRUCK-01 to SHIP-003 for cold chain backup."
         })
-    return json.dumps({"error": "Unknown prompt type"})
+    return json.dumps({"status": "ok"})
 
-
+# ---------------- Routes ----------------
 @app.route('/')
 def home():
-    return jsonify({
-        "status": "Online ✅",
-        "project": "Supply Chain Disruption Assistant & Fleet Utilisation Optimizer",
-        "powered_by": "IBM Bob AI",
-        "endpoints": {
-            "1_disruption": "GET/POST /api/disruption?event=Port Strike in Rotterdam",
-            "2_fleet": "GET/POST /api/fleet",
-            "3_cold_chain": "GET/POST /api/cold-chain"
-        }
-    })
-
+    return send_from_directory('.', 'dashboard.html')
 
 @app.route('/api/disruption', methods=['GET', 'POST'])
 def analyze_disruption():
@@ -69,39 +55,18 @@ def analyze_disruption():
         data = request.json
     else:
         data = {"disruption_event": request.args.get('event', 'Unknown disruption')}
-
-    prompt = f"""
-    Current Shipments: {json.dumps(MOCK_SHIPMENTS)}
-    Active Disruption: {data.get('disruption_event')}
-    Task: Identify which shipments are affected and recommend re-routing alternatives.
-    """
-    result = call_bob_ai(prompt)
-    return jsonify({"analysis": result})
-
+    prompt = f"Disruption: {data.get('disruption_event')}. Shipments: {json.dumps(MOCK_SHIPMENTS)}"
+    return jsonify({"analysis": call_bob_ai(prompt)})
 
 @app.route('/api/fleet', methods=['GET', 'POST'])
 def optimize_fleet():
-    prompt = f"""
-    Fleet Assets: {json.dumps(MOCK_FLEET)}
-    Current Shipment Needs: {json.dumps(MOCK_SHIPMENTS)}
-    Task: Identify idle fleet assets and suggest redeployment for overloaded routes.
-    """
-    result = call_bob_ai(prompt)
-    return jsonify({"optimization": result})
-
+    prompt = f"Fleet optimization. Assets: {json.dumps(MOCK_FLEET)}"
+    return jsonify({"optimization": call_bob_ai(prompt)})
 
 @app.route('/api/cold-chain', methods=['GET', 'POST'])
 def monitor_cold_chain():
-    iot_log = "Sensor T-998: Temp 8C (Threshold 2-8C). Duration: 2 hours."
-    target_shipment = [s for s in MOCK_SHIPMENTS if s['id'] == 'SHIP-002']
-    prompt = f"""
-    IoT Sensor Log: {iot_log}
-    Shipment Context: {json.dumps(target_shipment)}
-    Task: Detect temperature excursions and classify regulatory severity before delivery.
-    """
-    result = call_bob_ai(prompt)
-    return jsonify({"cold_chain_status": result})
-
+    prompt = "Cold chain temperature sensor IoT breach check."
+    return jsonify({"cold_chain_status": call_bob_ai(prompt)})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
