@@ -1,0 +1,29 @@
+team:
+  name: "RM3Technical"
+  track: "Open"
+  lead:
+    name: "Manan Gundigara"
+    email: "manangundigara3511@gmail.com"
+  members:
+    - name: "Meet Dabhi"
+      email: "meetdabhi48@gmail.com"
+    - name: "Mann Solanki"
+      email: "mannsolanki06@gmail.com"
+    - name: "Rudra kumar Patel "
+      email: "rudrarul162@gmail.com"
+
+submission:
+  title: "ChainPulse: AI Fleet Optimizer & Cold-Chain Sentinel"
+  problem_statement: >
+    Cascading weather and infrastructure disruptions strand critical freight while nearby
+    fleet assets sit idle. Crucially, unmonitored cold-chain temperature excursions ruin high-value
+    pharmaceuticals and perishables before delivery teams detect the breach.
+  solution_summary: >
+    An autonomous supply chain copilot powered by IBM Bob that correlates active disruptions,
+    triggers idle fleet redeployment via custom MCP tools, and audits real-time IoT sensor logs
+    to classify thermal excursion severity before cargo arrives.
+  key_features:
+    - "Automated shipment impact assessment for active weather and route hazards[cite: 3]"
+    - "Dynamic re-routing engine paired with idle asset redeployment recommendations[cite: 3]"
+    - "Cold-chain IoT telemetry monitor computing excursion duration and regulatory breach levels[cite: 3]"
+    - "IBM Bob MCP connector integrating external tracking tools with live dispatch workflows[cite: 1, 3]"
