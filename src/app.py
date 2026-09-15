@@ -1,68 +1,107 @@
-from flask import Flask, render_template_string
+import os
+import requests
 import json
+from flask import Flask, request, jsonify
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 
-# Mock Data: Simulating your supply chain database
-fleet_data = [
-    {"asset_id": "TRK-101", "status": "Idle", "location": "Ahmedabad Hub", "type": "Reefer (Cold)"},
-    {"asset_id": "TRK-102", "status": "Active", "location": "Route 47", "type": "Dry Van"}
+# IBM Bob Configuration
+BOB_API_KEY = os.getenv("BOB_API_KEY")
+BOB_API_URL = "https://api.bob.ibm.com/v1/chat/completions"
+
+# Mock Data
+MOCK_SHIPMENTS = [
+    {"id": "SHIP-001", "route": "Shanghai -> LA", "status": "In Transit", "cargo": "Electronics", "value": 200000},
+    {"id": "SHIP-002", "route": "Mumbai -> Rotterdam", "status": "Delayed", "cargo": "Vaccines", "value": 500000, "temp_sensor": "T-998"},
+    {"id": "SHIP-003", "route": "NY -> London", "status": "In Transit", "cargo": "Perishables", "value": 50000, "temp_sensor": "T-112"}
 ]
 
-shipment_data = [
-    {"shipment_id": "SC-809", "status": "At Risk", "temp_current": "9°C", "temp_limit": "8°C"},
-    {"shipment_id": "SC-810", "status": "On Track", "temp_current": "4°C", "temp_limit": "8°C"}
+MOCK_FLEET = [
+    {"id": "TRUCK-01", "location": "LA Port", "status": "Idle", "capacity": "Refrigerated"},
+    {"id": "TRUCK-02", "location": "Rotterdam", "status": "Idle", "capacity": "Standard"},
+    {"id": "VESSEL-09", "location": "Shanghai", "status": "Maintenance", "capacity": "Cold Storage"}
 ]
 
-# Simple Dashboard UI
-HTML_TEMPLATE = """
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>ChainPulse | RM3Technical</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #f4f4f9; color: #333; padding: 20px; }
-        h1 { color: #0f62fe; }
-        .card { background: white; padding: 15px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
-        .alert { color: #da1e28; font-weight: bold; }
-    </style>
-</head>
-<body>
-    <h1>ChainPulse Logistics & Fleet Monitor</h1>
-    
-    <div class="card">
-        <h2>Active Shipments (Cold-Chain)</h2>
-        <ul>
-            {% for shipment in shipments %}
-                <li>
-                    <strong>{{ shipment.shipment_id }}</strong> - 
-                    <span class="{% if shipment.status == 'At Risk' %}alert{% endif %}">
-                        {{ shipment.status }}
-                    </span> 
-                    (Current Temp: {{ shipment.temp_current }} | Limit: {{ shipment.temp_limit }})
-                </li>
-            {% endfor %}
-        </ul>
-    </div>
 
-    <div class="card">
-        <h2>Fleet Availability</h2>
-        <ul>
-            {% for asset in fleet %}
-                <li><strong>{{ asset.asset_id }}</strong> - {{ asset.status }} ({{ asset.location }}) - {{ asset.type }}</li>
-            {% endfor %}
-        </ul>
-    </div>
-</body>
-</html>
-"""
+def call_bob_ai(prompt):
+    """Helper to call IBM Bob API (with simulated fallback)."""
+    # --- SIMULATED BOB LOGIC FOR DEMO ---
+    if "disruption" in prompt.lower():
+        return json.dumps({
+            "affected_shipments": ["SHIP-002"],
+            "reason": "Port strike in Rotterdam",
+            "recommendation": "Reroute to Antwerp or use TRUCK-02"
+        })
+    if "cold chain" in prompt.lower() or "temperature" in prompt.lower():
+        return json.dumps({
+            "shipment_id": "SHIP-002",
+            "risk_level": "CRITICAL",
+            "action": "Immediate inspection required. Temp excursion detected at 08:00 AM."
+        })
+    if "fleet" in prompt.lower():
+        return json.dumps({
+            "idle_assets": ["TRUCK-01", "TRUCK-02"],
+            "redeployment_plan": "Assign TRUCK-01 to SHIP-003 for cold chain backup."
+        })
+    return json.dumps({"error": "Unknown prompt type"})
+
 
 @app.route('/')
-def dashboard():
-    return render_template_string(HTML_TEMPLATE, fleet=fleet_data, shipments=shipment_data)
+def home():
+    return jsonify({
+        "status": "Online ✅",
+        "project": "Supply Chain Disruption Assistant & Fleet Utilisation Optimizer",
+        "powered_by": "IBM Bob AI",
+        "endpoints": {
+            "1_disruption": "GET/POST /api/disruption?event=Port Strike in Rotterdam",
+            "2_fleet": "GET/POST /api/fleet",
+            "3_cold_chain": "GET/POST /api/cold-chain"
+        }
+    })
+
+
+@app.route('/api/disruption', methods=['GET', 'POST'])
+def analyze_disruption():
+    if request.is_json:
+        data = request.json
+    else:
+        data = {"disruption_event": request.args.get('event', 'Unknown disruption')}
+
+    prompt = f"""
+    Current Shipments: {json.dumps(MOCK_SHIPMENTS)}
+    Active Disruption: {data.get('disruption_event')}
+    Task: Identify which shipments are affected and recommend re-routing alternatives.
+    """
+    result = call_bob_ai(prompt)
+    return jsonify({"analysis": result})
+
+
+@app.route('/api/fleet', methods=['GET', 'POST'])
+def optimize_fleet():
+    prompt = f"""
+    Fleet Assets: {json.dumps(MOCK_FLEET)}
+    Current Shipment Needs: {json.dumps(MOCK_SHIPMENTS)}
+    Task: Identify idle fleet assets and suggest redeployment for overloaded routes.
+    """
+    result = call_bob_ai(prompt)
+    return jsonify({"optimization": result})
+
+
+@app.route('/api/cold-chain', methods=['GET', 'POST'])
+def monitor_cold_chain():
+    iot_log = "Sensor T-998: Temp 8C (Threshold 2-8C). Duration: 2 hours."
+    target_shipment = [s for s in MOCK_SHIPMENTS if s['id'] == 'SHIP-002']
+    prompt = f"""
+    IoT Sensor Log: {iot_log}
+    Shipment Context: {json.dumps(target_shipment)}
+    Task: Detect temperature excursions and classify regulatory severity before delivery.
+    """
+    result = call_bob_ai(prompt)
+    return jsonify({"cold_chain_status": result})
+
 
 if __name__ == '__main__':
-    # Run the server on port 5000
-    print("Starting ChainPulse UI on http://127.0.0.1:5000")
-    app.run(debug=True, port=5000)
+    app.run(host='0.0.0.0', port=5000, debug=True)
